@@ -6,13 +6,13 @@ const categories = [
     id: 3,
     title: "Pens ˚⊹♡",
     imageUrl: "https://pbs.twimg.com/media/G0KeZdRWIAAAc2W?format=jpg&name=small",
-    link: "Bracelets"
+    link: "Pens"
   },
   {
     id: 1,
     title: "Diaries ⋆｡𖦹°",
     imageUrl: "https://pbs.twimg.com/media/G0KebDUXoAAyymJ?format=jpg&name=small",
-      link: "Phone charms",
+      link: "Diaries",
   },
 
 
@@ -25,19 +25,19 @@ const categories = [
     id: 2,
     title: "Fans ˚⋆𐙚｡",
     imageUrl: "https://pbs.twimg.com/media/G0Kec1iXIAAOcSH?format=jpg&name=small",
-      link: "keychains"
+      link: "Fans"
   },
       {
     id: 5,
     title: "Water bottles ｡°✩",
     imageUrl:"https://pbs.twimg.com/media/G0KeeK9WAAEkKLT?format=jpg&name=small",
-     link: "Necklaces"
+     link: "Water bottles"
   },
         {
     id: 5,
     title: "Sipper ⋆⭒˚.⋆",
     imageUrl:"https://pbs.twimg.com/media/G0KfFR_XkAAIQpJ?format=jpg&name=900x900",
-     link: "Plushies"
+     link: "Sipper"
   },
           {
     id: 5,
