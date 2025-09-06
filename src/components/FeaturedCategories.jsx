@@ -4,14 +4,14 @@ import { Link } from 'react-router-dom';
 const categories = [
     {
     id: 3,
-    title: "Bracelets ˚⊹♡",
-    imageUrl: "https://i.postimg.cc/3xDtjrHL/image.png",
+    title: "Pens ˚⊹♡",
+    imageUrl: "https://pbs.twimg.com/media/G0KeZdRWIAAAc2W?format=jpg&name=small",
     link: "Bracelets"
   },
   {
     id: 1,
-    title: "Phone charms ⋆｡𖦹°",
-    imageUrl: "https://i.postimg.cc/T3mcLkrF/image.png",
+    title: "Diaries ⋆｡𖦹°",
+    imageUrl: "https://pbs.twimg.com/media/G0KebDUXoAAyymJ?format=jpg&name=small",
       link: "Phone charms",
   },
 
@@ -23,21 +23,27 @@ const categories = [
   // },
       {
     id: 2,
-    title: "keychains ˚⋆𐙚｡",
-    imageUrl: "https://i.postimg.cc/J0zyNQGb/image.png",
+    title: "Fans ˚⋆𐙚｡",
+    imageUrl: "https://pbs.twimg.com/media/G0Kec1iXIAAOcSH?format=jpg&name=small",
       link: "keychains"
   },
       {
     id: 5,
-    title: "Necklaces ｡°✩",
-    imageUrl:"https://i.postimg.cc/NGST66fc/image.png",
+    title: "Water bottles ｡°✩",
+    imageUrl:"https://pbs.twimg.com/media/G0KeeK9WAAEkKLT?format=jpg&name=small",
      link: "Necklaces"
   },
         {
     id: 5,
-    title: "Plushies / Trinkets ⋆⭒˚.⋆",
-    imageUrl:"https://scontent.flhe7-2.fna.fbcdn.net/v/t1.15752-9/525576846_1213728490767254_1766428545358139292_n.jpg?stp=dst-jpg_s480x480_tt6&_nc_cat=109&ccb=1-7&_nc_sid=0024fc&_nc_ohc=_BT1RcjUB3IQ7kNvwFYF7iA&_nc_oc=AdmwDteBLL-s_joZNncU601LCZdrCpmW9sspFevt0nLdtB0zgEHEY2eWI4KzhJbCsFs&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent.flhe7-2.fna&oh=03_Q7cD2wENRdhZhSmaPM4YuqQ0mVuzXHSDxRlf_BrAemBjvMfR3Q&oe=68B3D4B9",
+    title: "Sipper ⋆⭒˚.⋆",
+    imageUrl:"https://pbs.twimg.com/media/G0KfFR_XkAAIQpJ?format=jpg&name=900x900",
      link: "Plushies"
+  },
+          {
+    id: 5,
+    title: "Markers ⋆⭒˚.⋆",
+    imageUrl:"https://pbs.twimg.com/media/G0KfRR9XcAAU2QU?format=jpg&name=small",
+     link: "Markers"
   },
   //       {
   //   id: 6,
