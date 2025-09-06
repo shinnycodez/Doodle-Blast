@@ -27,20 +27,35 @@ const [formData, setFormData] = useState({
   image2: "",
   isTopProduct: false,
   available: true,
-  variationInput: "",      // for temporary input field
-  variations: [],          // array to hold variations with stock status
+  variationInput: "",      // for temporary color input field
+  variations: [],          // array to hold color variations
+  sizeInput: "",          // for temporary size input field
+  sizes: [],              // array to hold size variations
 });
+
+  // New discount-related state
+  const [discountFormData, setDiscountFormData] = useState({
+    productIds: [],
+    discountPercentage: "",
+    startDate: "",
+    endDate: "",
+    description: "",
+  });
 
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [contacts, setContacts] = useState([]); // New state for contacts
+  const [discounts, setDiscounts] = useState([]); // New state for discounts
   const [loading, setLoading] = useState(false);
+  const [discountLoading, setDiscountLoading] = useState(false); // New loading state for discounts
   const [successMsg, setSuccessMsg] = useState("");
+  const [discountSuccessMsg, setDiscountSuccessMsg] = useState(""); // New success message for discounts
   const [editId, setEditId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [showOrders, setShowOrders] = useState(false);
   const [showContacts, setShowContacts] = useState(false); // New state for contacts visibility
+  const [showDiscounts, setShowDiscounts] = useState(false); // New state for discounts visibility
   const [expandedOrders, setExpandedOrders] = useState({});
   const [expandedContacts, setExpandedContacts] = useState({}); // New state for expanded contacts
   const [viewingImage, setViewingImage] = useState(null); // State for image viewer
@@ -48,6 +63,21 @@ const [formData, setFormData] = useState({
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
       setProducts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // New useEffect for discounts
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "discounts"), (snapshot) => {
+      const discountsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      // Sort by creation date (newest first)
+      discountsData.sort((a, b) => {
+        const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+        const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+        return bTime - aTime;
+      });
+      setDiscounts(discountsData);
     });
     return () => unsubscribe();
   }, []);
@@ -138,6 +168,127 @@ const [formData, setFormData] = useState({
     }));
   };
 
+  // New handler for discount form changes
+  const handleDiscountChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setDiscountFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  // New handler for product selection in discount form
+  const handleProductSelection = (productId, isSelected) => {
+    setDiscountFormData((prev) => ({
+      ...prev,
+      productIds: isSelected
+        ? [...prev.productIds, productId]
+        : prev.productIds.filter(id => id !== productId),
+    }));
+  };
+
+  // New function to handle discount submission
+  const handleDiscountSubmit = async (e) => {
+    e.preventDefault();
+    setDiscountLoading(true);
+    setDiscountSuccessMsg("");
+
+    try {
+      if (!discountFormData.productIds.length) {
+        setDiscountSuccessMsg("❌ Please select at least one product.");
+        setDiscountLoading(false);
+        return;
+      }
+
+      if (!discountFormData.discountPercentage || discountFormData.discountPercentage <= 0 || discountFormData.discountPercentage > 100) {
+        setDiscountSuccessMsg("❌ Please enter a valid discount percentage (1-100).");
+        setDiscountLoading(false);
+        return;
+      }
+
+      const startDate = new Date(discountFormData.startDate);
+      const endDate = new Date(discountFormData.endDate);
+
+      if (startDate >= endDate) {
+        setDiscountSuccessMsg("❌ End date must be after start date.");
+        setDiscountLoading(false);
+        return;
+      }
+
+      // Create discount document
+      await addDoc(collection(db, "discounts"), {
+        productIds: discountFormData.productIds,
+        discountPercentage: parseFloat(discountFormData.discountPercentage),
+        startDate: startDate,
+        endDate: endDate,
+        description: discountFormData.description,
+        isActive: true,
+        createdAt: serverTimestamp(),
+      });
+
+      setDiscountSuccessMsg("✅ Discount created successfully!");
+      setDiscountFormData({
+        productIds: [],
+        discountPercentage: "",
+        startDate: "",
+        endDate: "",
+        description: "",
+      });
+    } catch (err) {
+      console.error("Error creating discount:", err);
+      setDiscountSuccessMsg("❌ Failed to create discount.");
+    }
+
+    setDiscountLoading(false);
+  };
+
+  // New function to delete discount
+  const deleteDiscount = async (discountId) => {
+    if (confirm("Are you sure you want to delete this discount? This action cannot be undone.")) {
+      try {
+        await deleteDoc(doc(db, "discounts", discountId));
+        console.log(`Discount ${discountId} deleted successfully.`);
+      } catch (err) {
+        console.error("Failed to delete discount:", err);
+      }
+    }
+  };
+
+  // New function to toggle discount status
+  const toggleDiscountStatus = async (discountId, currentStatus) => {
+    try {
+      const discountRef = doc(db, "discounts", discountId);
+      await updateDoc(discountRef, {
+        isActive: !currentStatus,
+      });
+      console.log(`Discount ${discountId} status updated.`);
+    } catch (err) {
+      console.error("Failed to update discount status:", err);
+    }
+  };
+
+  // Helper function to check if discount is currently valid
+  const isDiscountActive = (discount) => {
+    if (!discount.isActive) return false;
+    const now = new Date();
+    const startDate = discount.startDate?.toDate ? discount.startDate.toDate() : new Date(discount.startDate);
+    const endDate = discount.endDate?.toDate ? discount.endDate.toDate() : new Date(discount.endDate);
+    return now >= startDate && now <= endDate;
+  };
+
+  // Helper function to get discount status text
+  const getDiscountStatusText = (discount) => {
+    if (!discount.isActive) return { text: "Disabled", color: "text-gray-600" };
+    
+    const now = new Date();
+    const startDate = discount.startDate?.toDate ? discount.startDate.toDate() : new Date(discount.startDate);
+    const endDate = discount.endDate?.toDate ? discount.endDate.toDate() : new Date(discount.endDate);
+    
+    if (now < startDate) return { text: "Scheduled", color: "text-blue-600" };
+    if (now > endDate) return { text: "Expired", color: "text-red-600" };
+    return { text: "Active", color: "text-green-600" };
+  };
+
   const markAsDelivered = async (orderId) => {
     try {
       const orderRef = doc(db, "orders", orderId);
@@ -190,7 +341,8 @@ const handleSubmit = async (e) => {
         images: [formData.image1, formData.image2],
         isTopProduct: formData.isTopProduct,
         available: formData.available,
-        variations: formData.variations, // Now includes stock status for each variation
+        variations: formData.variations, // Color variations
+        sizes: formData.sizes, // Size variations
       });
       setSuccessMsg("✅ Product updated successfully!");
       setEditId(null);
@@ -204,7 +356,8 @@ const handleSubmit = async (e) => {
         images: [formData.image1, formData.image2],
         isTopProduct: formData.isTopProduct,
         available: formData.available,
-        variations: formData.variations, // Include variations with stock status
+        variations: formData.variations, // Color variations
+        sizes: formData.sizes, // Size variations
         createdAt: serverTimestamp(),
       });
       setSuccessMsg("✅ Product added successfully!");
@@ -220,8 +373,10 @@ const handleSubmit = async (e) => {
       image2: "",
       isTopProduct: false,
       available: true,
-      variations: [], // Reset variations
-      variationInput: "" // Reset input field
+      variations: [], // Reset color variations
+      variationInput: "", // Reset color input field
+      sizes: [], // Reset size variations
+      sizeInput: "" // Reset size input field
     });
   } catch (err) {
     console.error("Error:", err);
@@ -242,17 +397,6 @@ const handleSubmit = async (e) => {
   };
 
 const handleEdit = (product) => {
-  // Convert old variation format to new format if needed
-  const processedVariations = product.variations ? product.variations.map(variation => {
-    if (typeof variation === 'string') {
-      // Old format - convert to new format
-      return { name: variation, inStock: true };
-    } else {
-      // New format - keep as is
-      return variation;
-    }
-  }) : [];
-
   setFormData({
     title: product.title,
     price: product.price,
@@ -263,44 +407,15 @@ const handleEdit = (product) => {
     image2: product.images?.[1] || "",
     isTopProduct: product.isTopProduct || false,
     available: product.available !== false,
-    variations: processedVariations,
-    variationInput: ""
+    variations: product.variations || [], // Color variations
+    variationInput: "",
+    sizes: product.sizes || [], // Size variations
+    sizeInput: ""
   });
   setEditId(product.id);
   setShowForm(true);
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
-
-  // Function to toggle stock status for individual variations
-  const toggleVariationStock = async (productId, variationIndex) => {
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-
-    const updatedVariations = [...(product.variations || [])];
-    
-    // Handle both old and new format
-    if (typeof updatedVariations[variationIndex] === 'string') {
-      // Convert old format to new format
-      updatedVariations[variationIndex] = {
-        name: updatedVariations[variationIndex],
-        inStock: false // Toggle to false since we're clicking to change stock
-      };
-    } else {
-      // New format - toggle stock status
-      updatedVariations[variationIndex] = {
-        ...updatedVariations[variationIndex],
-        inStock: !updatedVariations[variationIndex].inStock
-      };
-    }
-
-    try {
-      await updateDoc(doc(db, "products", productId), {
-        variations: updatedVariations
-      });
-    } catch (err) {
-      console.error("Failed to update variation stock:", err);
-    }
-  };
 
   const toggleExpand = (orderId) => {
     setExpandedOrders((prev) => ({
@@ -382,19 +497,18 @@ const OrderDetails = ({ order }) => (
 
     <div>
       <strong>Items:</strong>
-<ul className="list-disc ml-4 sm:ml-5 mt-1 text-xs sm:text-sm">
-  {(order.items || []).map((item, i) => (
-    <li key={i} className="font-semibold">
-      {item.title} – 
-      {item.variation && ` Color: ${item.variation} –`}
-      {item.type && ` Type: ${item.type} –`}
-      {item.size && ` Size: ${item.size} –`}
-      Qty: {item.quantity} – 
-      Price: PKR {item.price?.toLocaleString()}
-    </li>
-  ))}
-</ul>
-
+      <ul className="list-disc ml-4 sm:ml-5 mt-1 text-xs sm:text-sm">
+        {(order.items || []).map((item, i) => (
+          <li key={i}>
+            {item.title} – 
+            {item.variation && ` Color: ${item.variation} –`}
+            {item.size && ` Size: ${item.size} –`}
+            {item.type && ` Type: ${item.type} –`}
+            Qty: {item.quantity} – 
+            Price: PKR {item.price?.toLocaleString()}
+          </li>
+        ))}
+      </ul>
     </div>
   </div>
 );
@@ -427,6 +541,7 @@ const OrderDetails = ({ order }) => (
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8 sm:space-y-10">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
 
+        {/* Add Product Form */}
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
           <button
             onClick={() => setShowForm(!showForm)}
@@ -454,82 +569,111 @@ const OrderDetails = ({ order }) => (
               <input name="image1" placeholder="Image 1 URL (Optional)" className="w-full border border-gray-300 p-2 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base" value={formData.image1} onChange={handleChange} />
               <input name="image2" placeholder="Image 2 URL (Optional)" className="w-full border border-gray-300 p-2 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base" value={formData.image2} onChange={handleChange} />
 
-{/* Color Variations Input - Updated */}
-<div>
-  <label className="block text-sm sm:text-base font-medium text-gray-700 mb-1">Product Variations (e.g., Red, Yellow)</label>
-  <div className="flex gap-2 mb-2">
-    <input
-      type="text"
-      name="variationInput"
-      value={formData.variationInput}
-      onChange={handleChange}
-      placeholder="Add a color (e.g., Red)"
-      className="flex-1 border border-gray-300 p-2 rounded-md text-sm sm:text-base"
-    />
-    <button
-      type="button"
-      onClick={() => {
-        if (formData.variationInput.trim()) {
-          setFormData((prev) => ({
-            ...prev,
-            variations: [...prev.variations, { name: prev.variationInput.trim(), inStock: true }],
-            variationInput: "",
-          }));
-        }
-      }}
-      className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm sm:text-base"
-    >
-      Add
-    </button>
-  </div>
+              {/* Color Variations Input */}
+              <div>
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-1">Color Variations (e.g., Red, Blue)</label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    name="variationInput"
+                    value={formData.variationInput}
+                    onChange={handleChange}
+                    placeholder="Add a color (e.g., Red)"
+                    className="flex-1 border border-gray-300 p-2 rounded-md text-sm sm:text-base"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formData.variationInput.trim()) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          variations: [...prev.variations, prev.variationInput.trim()],
+                          variationInput: "",
+                        }));
+                      }
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm sm:text-base"
+                  >
+                    Add
+                  </button>
+                </div>
 
-  {/* Show list of variations with stock toggle - Updated */}
-  {formData.variations && formData.variations.length > 0 && (
-    <div className="flex flex-wrap gap-2">
-      {formData.variations.map((variation, i) => {
-        const variationName = typeof variation === 'string' ? variation : variation.name;
-        const isInStock = typeof variation === 'string' ? true : variation.inStock;
-        
-        return (
-          <div key={i} className={`px-3 py-1 rounded-full text-sm flex items-center gap-2 ${isInStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-            <span>{variationName}</span>
-            <button
-              type="button"
-              onClick={() => {
-                setFormData((prev) => ({
-                  ...prev,
-                  variations: prev.variations.map((v, index) => {
-                    if (index === i) {
-                      return typeof v === 'string' 
-                        ? { name: v, inStock: false }
-                        : { ...v, inStock: !v.inStock };
-                    }
-                    return v;
-                  })
-                }));
-              }}
-              className={`text-xs px-2 py-1 rounded-full ${isInStock ? 'bg-green-200 hover:bg-green-300 text-green-800' : 'bg-red-200 hover:bg-red-300 text-red-800'}`}
-            >
-              {isInStock ? '✓ In Stock' : '✗ Out of Stock'}
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setFormData((prev) => ({
-                  ...prev,
-                  variations: prev.variations.filter((_, index) => index !== i),
-                }))
-              }
-              className="text-red-500 hover:text-red-700 font-bold"
-            >
-              &times;
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  )}
-</div>
+                {/* Show list of color variations */}
+                {formData.variations && formData.variations.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.variations.map((v, i) => (
+                      <span key={i} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                        {v}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              variations: prev.variations.filter((_, index) => index !== i),
+                            }))
+                          }
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Size Variations Input */}
+              <div>
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-1">Size Variations (e.g., S, M, L)</label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    name="sizeInput"
+                    value={formData.sizeInput}
+                    onChange={handleChange}
+                    placeholder="Add a size (e.g., S, M, L, XL)"
+                    className="flex-1 border border-gray-300 p-2 rounded-md text-sm sm:text-base"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formData.sizeInput.trim()) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          sizes: [...prev.sizes, prev.sizeInput.trim()],
+                          sizeInput: "",
+                        }));
+                      }
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm sm:text-base"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                {/* Show list of size variations */}
+                {formData.sizes && formData.sizes.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.sizes.map((size, i) => (
+                      <span key={i} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                        {size}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              sizes: prev.sizes.filter((_, index) => index !== i),
+                            }))
+                          }
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mt-4">
                 <label className="flex items-center gap-2 text-sm sm:text-base text-gray-700 cursor-pointer">
@@ -553,6 +697,204 @@ const OrderDetails = ({ order }) => (
           )}
         </div>
 
+        {/* Discount Management Section */}
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+          <button
+            onClick={() => setShowDiscounts(!showDiscounts)}
+            className="w-full bg-black text-white px-4 py-3 text-left rounded-md hover:bg-gray-800 transition-colors duration-200 flex items-center justify-between text-base sm:text-lg font-medium"
+          >
+            <span>{showDiscounts ? "➖ Hide Discount Management" : "🎯 Manage Product Discounts"}</span>
+            <svg className={`w-5 h-5 transition-transform duration-200 ${showDiscounts ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+          </button>
+
+          {showDiscounts && (
+            <div className="mt-4 bg-gray-50 p-4 sm:p-6 rounded-lg shadow-inner space-y-6">
+              {/* Create New Discount Form */}
+              <form onSubmit={handleDiscountSubmit} className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border space-y-4">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">🎯 Create New Discount</h3>
+                
+                {discountSuccessMsg && (
+                  <p className={`text-center text-sm sm:text-base p-2 rounded ${discountSuccessMsg.startsWith('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {discountSuccessMsg}
+                  </p>
+                )}
+
+                <div>
+                  <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">Select Products for Discount:</label>
+                  <div className="max-h-60 overflow-y-auto border border-gray-300 rounded-md p-3 bg-gray-50">
+                    {products.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No products available. Add products first.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {products.map((product) => (
+                          <label key={product.id} className="flex items-center gap-3 p-2 hover:bg-gray-100 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={discountFormData.productIds.includes(product.id)}
+                              onChange={(e) => handleProductSelection(product.id, e.target.checked)}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                            <img src={product.coverImage} alt={product.title} className="w-12 h-12 object-cover rounded" />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-900">{product.title}</p>
+                              <p className="text-xs text-gray-600">PKR {product.price?.toLocaleString()}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {discountFormData.productIds.length > 0 && (
+                    <p className="text-sm text-green-600 mt-2">✅ {discountFormData.productIds.length} product(s) selected</p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Discount Percentage (%)</label>
+                    <input
+                      type="number"
+                      name="discountPercentage"
+                      value={discountFormData.discountPercentage}
+                      onChange={handleDiscountChange}
+                      placeholder="e.g., 20"
+                      min="1"
+                      max="100"
+                      className="w-full border border-gray-300 p-2 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
+                    <input
+                      type="text"
+                      name="description"
+                      value={discountFormData.description}
+                      onChange={handleDiscountChange}
+                      placeholder="e.g., Summer Sale"
+                      className="w-full border border-gray-300 p-2 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <input
+                      type="datetime-local"
+                      name="startDate"
+                      value={discountFormData.startDate}
+                      onChange={handleDiscountChange}
+                      className="w-full border border-gray-300 p-2 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <input
+                      type="datetime-local"
+                      name="endDate"
+                      value={discountFormData.endDate}
+                      onChange={handleDiscountChange}
+                      className="w-full border border-gray-300 p-2 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={discountLoading}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-md transition-colors duration-200 text-base sm:text-lg font-medium disabled:bg-green-400 disabled:cursor-not-allowed"
+                >
+                  {discountLoading ? "Creating Discount..." : "Create Discount"}
+                </button>
+              </form>
+
+              {/* Existing Discounts List */}
+              <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">📋 Existing Discounts ({discounts.length})</h3>
+                
+                {discounts.length === 0 ? (
+                  <p className="text-center text-gray-500 text-sm sm:text-base py-4">No discounts created yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {discounts.map((discount) => {
+                      const statusInfo = getDiscountStatusText(discount);
+                      const isActive = isDiscountActive(discount);
+                      
+                      return (
+                        <div key={discount.id} className={`border rounded-lg p-4 ${isActive ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-gray-50'}`}>
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3">
+                            <div>
+                              <h4 className="text-lg font-semibold text-gray-900">
+                                {discount.discountPercentage}% OFF {discount.description && `- ${discount.description}`}
+                              </h4>
+                              <p className={`text-sm font-medium ${statusInfo.color}`}>
+                                Status: {statusInfo.text}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 mt-2 sm:mt-0">
+                              <button
+                                onClick={() => toggleDiscountStatus(discount.id, discount.isActive)}
+                                className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${
+                                  discount.isActive 
+                                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
+                                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                }`}
+                              >
+                                {discount.isActive ? 'Disable' : 'Enable'}
+                              </button>
+                              <button
+                                onClick={() => deleteDiscount(discount.id)}
+                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-sm rounded-md transition-colors duration-200"
+                              >
+                                🗑️ Delete
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-700 mb-3">
+                            <div>
+                              <strong>Start:</strong> {discount.startDate?.toDate?.().toLocaleString() || new Date(discount.startDate).toLocaleString()}
+                            </div>
+                            <div>
+                              <strong>End:</strong> {discount.endDate?.toDate?.().toLocaleString() || new Date(discount.endDate).toLocaleString()}
+                            </div>
+                          </div>
+
+                          <div>
+                            <strong className="text-sm text-gray-700">Products ({discount.productIds.length}):</strong>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {discount.productIds.map((productId) => {
+                                const product = products.find(p => p.id === productId);
+                                return product ? (
+                                  <div key={productId} className="flex items-center gap-2 bg-white border border-gray-200 rounded-md p-2">
+                                    <img src={product.coverImage} alt={product.title} className="w-8 h-8 object-cover rounded" />
+                                    <div>
+                                      <p className="text-xs font-medium">{product.title}</p>
+                                      <p className="text-xs text-gray-600">
+                                        PKR {product.price?.toLocaleString()} → PKR {Math.round(product.price * (1 - discount.discountPercentage / 100)).toLocaleString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span key={productId} className="text-xs text-red-500 bg-red-100 px-2 py-1 rounded">Product not found</span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Product Inventory Section */}
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
           <button
             onClick={() => setShowInventory(!showInventory)}
@@ -567,58 +909,63 @@ const OrderDetails = ({ order }) => (
               {products.length === 0 ? (
                 <p className="col-span-full text-center text-gray-500 text-sm sm:text-base py-4">No products found. Add a product to get started!</p>
               ) : (
-                products.map((product) => (
-                  <div key={product.id} className={`flex flex-col sm:flex-row gap-4 border border-gray-200 p-4 rounded-md shadow-sm ${product.available === false ? 'bg-gray-100 opacity-80' : 'bg-white'}`}>
-                    <img src={product.coverImage} className="w-24 h-24 object-contain rounded-md flex-shrink-0 mx-auto sm:mx-0" alt={product.title} />
-                    <div className="flex-1 text-center sm:text-left">
-                      <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-1">{product.title}</h3>
-                      <p className="text-sm text-gray-700">Price: PKR {product.price?.toLocaleString()}</p>
-                      <p className="text-sm text-gray-700">Category: {product.category}</p>
-                      <p className="text-sm text-gray-700">Top Product: {product.isTopProduct ? "Yes" : "No"}</p>
-                      
-                      {/* Updated Variations Display with Individual Stock Management */}
-                      {product.variations && product.variations.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-sm text-gray-700 mb-1">Variations:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {product.variations.map((variation, index) => {
-                              const variationName = typeof variation === 'string' ? variation : variation.name;
-                              const isInStock = typeof variation === 'string' ? true : variation.inStock;
-                              
-                              return (
-                                <button
-                                  key={index}
-                                  onClick={() => toggleVariationStock(product.id, index)}
-                                  className={`text-xs px-2 py-1 rounded-full transition-colors duration-200 ${
-                                    isInStock 
-                                      ? 'bg-green-100 text-green-800 hover:bg-green-200' 
-                                      : 'bg-red-100 text-red-800 hover:bg-red-200'
-                                  }`}
-                                  title={`Click to mark as ${isInStock ? 'out of stock' : 'in stock'}`}
-                                >
-                                  {variationName} {isInStock ? '✓' : '✗'}
-                                </button>
-                              );
-                            })}
+                products.map((product) => {
+                  // Check if product has any active discount
+                  const activeDiscount = discounts.find(discount => 
+                    discount.productIds.includes(product.id) && isDiscountActive(discount)
+                  );
+                  const discountedPrice = activeDiscount 
+                    ? Math.round(product.price * (1 - activeDiscount.discountPercentage / 100))
+                    : null;
+
+                  return (
+                    <div key={product.id} className={`flex flex-col sm:flex-row gap-4 border border-gray-200 p-4 rounded-md shadow-sm ${product.available === false ? 'bg-gray-100 opacity-80' : 'bg-white'} ${activeDiscount ? 'ring-2 ring-green-300' : ''}`}>
+                      <div className="relative">
+                        <img src={product.coverImage} className="w-24 h-24 object-contain rounded-md flex-shrink-0 mx-auto sm:mx-0" alt={product.title} />
+                        {activeDiscount && (
+                          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                            -{activeDiscount.discountPercentage}%
                           </div>
+                        )}
+                      </div>
+                      <div className="flex-1 text-center sm:text-left">
+                        <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-1">{product.title}</h3>
+                        <div className="text-sm text-gray-700">
+                          {activeDiscount ? (
+                            <div>
+                              <span className="line-through text-red-500">PKR {product.price?.toLocaleString()}</span>
+                              <span className="ml-2 font-bold text-green-600">PKR {discountedPrice?.toLocaleString()}</span>
+                              <p className="text-xs text-green-600 font-medium">{activeDiscount.description || 'On Sale'}</p>
+                            </div>
+                          ) : (
+                            <p>Price: PKR {product.price?.toLocaleString()}</p>
+                          )}
                         </div>
-                      )}
-                      
-                      <p className="text-sm mt-1">Status: <span className={`font-medium ${product.available === false ? 'text-red-600' : 'text-green-600'}`}>
-                        {product.available === false ? 'Out of Stock' : 'Available'}
-                      </span></p>
-                      <div className="mt-3 flex justify-center sm:justify-start gap-2">
-                        <button onClick={() => handleEdit(product)} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 text-xs sm:text-sm rounded-md transition-colors duration-200">Edit</button>
-                        <button onClick={() => handleDelete(product.id)} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-xs sm:text-sm rounded-md transition-colors duration-200">Delete</button>
+                        <p className="text-sm text-gray-700">Category: {product.category}</p>
+                        <p className="text-sm text-gray-700">Top Product: {product.isTopProduct ? "Yes" : "No"}</p>
+                        {product.variations && product.variations.length > 0 && (
+                          <p className="text-sm text-gray-700">Colors: {product.variations.join(', ')}</p>
+                        )}
+                        {product.sizes && product.sizes.length > 0 && (
+                          <p className="text-sm text-gray-700">Sizes: {product.sizes.join(', ')}</p>
+                        )}
+                        <p className="text-sm mt-1">Status: <span className={`font-medium ${product.available === false ? 'text-red-600' : 'text-green-600'}`}>
+                          {product.available === false ? 'Out of Stock' : 'Available'}
+                        </span></p>
+                        <div className="mt-3 flex justify-center sm:justify-start gap-2">
+                          <button onClick={() => handleEdit(product)} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 text-xs sm:text-sm rounded-md transition-colors duration-200">Edit</button>
+                          <button onClick={() => handleDelete(product.id)} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-xs sm:text-sm rounded-md transition-colors duration-200">Delete</button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}
         </div>
 
+        {/* Orders Section */}
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
           <button
             onClick={() => setShowOrders(!showOrders)}
@@ -645,9 +992,9 @@ const OrderDetails = ({ order }) => (
                           <div key={order.id} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm mb-4 last:mb-0">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                               <div className="mb-2 sm:mb-0">
-                        <p className="font-semibold text-base sm:text-lg text-gray-900">
-  Order by: {order.shippingAddress?.fullName || order.customerEmail}
-</p>
+                                <p className="font-semibold text-base sm:text-lg text-gray-900">
+                                  Order by: {order.shippingAddress?.fullName || order.customerEmail}
+                                </p>
                                 <p className="text-sm text-gray-600">Total: PKR {order.total?.toLocaleString()}</p>
                                 <p className="text-sm text-gray-600">Payment: {order.payment}</p>
                               </div>
@@ -692,10 +1039,9 @@ const OrderDetails = ({ order }) => (
                           <div key={order.id} className="border border-green-300 rounded-lg p-4 bg-green-50 shadow-sm mb-4 last:mb-0">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                               <div className="mb-2 sm:mb-0">
-                           <p className="font-semibold text-base sm:text-lg text-gray-900">
-  Order by: {order.shippingAddress?.fullName || order.user}
-</p>
-
+                                <p className="font-semibold text-base sm:text-lg text-gray-900">
+                                  Order by: {order.shippingAddress?.fullName || order.user}
+                                </p>
                                 <p className="text-sm text-gray-600">Total: PKR {order.total?.toLocaleString()}</p>
                                 <p className="text-sm text-gray-600">Payment: {order.payment}</p>
                               </div>
@@ -728,7 +1074,7 @@ const OrderDetails = ({ order }) => (
           )}
         </div>
 
-        {/* New Contact Messages Section */}
+        {/* Contact Messages Section */}
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
           <button
             onClick={() => setShowContacts(!showContacts)}
@@ -787,6 +1133,7 @@ const OrderDetails = ({ order }) => (
           )}
         </div>
 
+        {/* Sales Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 text-center bg-white p-4 sm:p-6 rounded-lg shadow-md">
           <div className="p-3 sm:p-4 bg-gray-50 rounded-md">
             <p className="text-base sm:text-lg font-semibold text-gray-700">📅 Daily Sales</p>
@@ -802,6 +1149,7 @@ const OrderDetails = ({ order }) => (
           </div>
         </div>
 
+        {/* Monthly Sales Chart */}
         <div className="bg-white p-4 sm:p-6 mt-4 sm:mt-6 rounded-lg shadow-md">
           <h2 className="text-lg sm:text-xl font-bold mb-4 text-gray-800">📊 Monthly Sales Overview</h2>
           <ResponsiveContainer width="100%" height={300}>

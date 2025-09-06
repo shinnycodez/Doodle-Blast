@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   doc,
-  getDoc
+  getDoc,
+  collection,
+  onSnapshot
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -15,10 +17,43 @@ const ProductPage = ({ onOpenCart }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
+  const [discounts, setDiscounts] = useState([]);
+  const [activeDiscount, setActiveDiscount] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariation, setSelectedVariation] = useState(null);
+  const [selectedSize, setSelectedSize] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Fetch discounts from Firestore
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "discounts"), (snapshot) => {
+      const discountsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setDiscounts(discountsData);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Helper function to check if discount is currently active
+  const isDiscountActive = (discount) => {
+    if (!discount.isActive) return false;
+    const now = new Date();
+    const startDate = discount.startDate?.toDate ? discount.startDate.toDate() : new Date(discount.startDate);
+    const endDate = discount.endDate?.toDate ? discount.endDate.toDate() : new Date(discount.endDate);
+    return now >= startDate && now <= endDate;
+  };
+
+  // Check for active discount when product or discounts change
+  useEffect(() => {
+    if (product && discounts.length > 0) {
+      const currentActiveDiscount = discounts.find(discount => 
+        discount.productIds.includes(product.id) && isDiscountActive(discount)
+      );
+      setActiveDiscount(currentActiveDiscount || null);
+    } else {
+      setActiveDiscount(null);
+    }
+  }, [product, discounts]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -28,19 +63,13 @@ const ProductPage = ({ onOpenCart }) => {
         if (docSnap.exists()) {
           const productData = { id: docSnap.id, ...docSnap.data() };
           setProduct(productData);
-          // Set the first available variation as selected by default if variations exist
+          // Set the first variation as selected by default if variations exist
           if (productData.variations && productData.variations.length > 0) {
-            const firstAvailableVariation = productData.variations.find(variation => {
-              if (typeof variation === 'string') return true; // Old format - assume available
-              return variation.inStock; // New format - check stock status
-            });
-            
-            if (firstAvailableVariation) {
-              const variationName = typeof firstAvailableVariation === 'string' 
-                ? firstAvailableVariation 
-                : firstAvailableVariation.name;
-              setSelectedVariation(variationName);
-            }
+            setSelectedVariation(productData.variations[0]);
+          }
+          // Set the first size as selected by default if sizes exist
+          if (productData.sizes && productData.sizes.length > 0) {
+            setSelectedSize(productData.sizes[0]);
           }
         } else {
           console.error('No such product!');
@@ -53,6 +82,17 @@ const ProductPage = ({ onOpenCart }) => {
 
     fetchProduct();
   }, [id, navigate]);
+
+  // Calculate discounted price
+  const getDiscountedPrice = () => {
+    if (!activeDiscount) return product.price;
+    return Math.round(product.price * (1 - activeDiscount.discountPercentage / 100));
+  };
+
+  // Get the price to use for cart operations
+  const getCurrentPrice = () => {
+    return activeDiscount ? getDiscountedPrice() : product.price;
+  };
 
   // Save cart to storage (consistent with cart component and checkout)
   const saveCartToStorage = (cartData) => {
@@ -76,45 +116,26 @@ const ProductPage = ({ onOpenCart }) => {
     }
   };
 
-  // Check if selected variation is in stock
-  const isSelectedVariationInStock = () => {
-    if (!selectedVariation || !product.variations) return true;
-    
-    const variation = product.variations.find(v => {
-      const variationName = typeof v === 'string' ? v : v.name;
-      return variationName === selectedVariation;
-    });
-    
-    if (!variation) return false;
-    return typeof variation === 'string' ? true : variation.inStock;
-  };
-
-  // Check if product or selected variation is available
-  const isAvailableForPurchase = () => {
-    if (!product.available) return false;
-    if (product.variations && product.variations.length > 0) {
-      return isSelectedVariationInStock();
-    }
-    return true;
-  };
-
   const handleAddToCart = async () => {
-    if (loading || !isAvailableForPurchase()) return;
+    if (loading || !product.available) return;
     setLoading(true);
 
-    // Create a unique identifier that includes the variation if it exists
-    const itemId = selectedVariation 
-      ? `${product.id}_${selectedVariation}_${Date.now()}`
-      : `${product.id}_${Date.now()}`;
+    // Create a unique identifier that includes both variation and size if they exist
+    const variationPart = selectedVariation ? `_${selectedVariation}` : '';
+    const sizePart = selectedSize ? `_${selectedSize}` : '';
+    const itemId = `${product.id}${variationPart}${sizePart}_${Date.now()}`;
 
     const cartItem = {
       id: itemId,
       productId: product.id,
       title: product.title,
-      price: product.price,
+      price: getCurrentPrice(), // Use discounted price if available
+      originalPrice: product.price, // Store original price for reference
       image: product.coverImage,
       quantity,
-      variation: selectedVariation, // Include the selected variation
+      variation: selectedVariation, // Include the selected color variation
+      size: selectedSize, // Include the selected size
+      discountApplied: activeDiscount ? activeDiscount.discountPercentage : null,
       createdAt: new Date().toISOString(),
     };
 
@@ -125,7 +146,8 @@ const ProductPage = ({ onOpenCart }) => {
       // Check if item with same configuration already exists
       const existingIndex = currentCart.findIndex(item =>
         item.productId === cartItem.productId && 
-        item.variation === cartItem.variation
+        item.variation === cartItem.variation &&
+        item.size === cartItem.size
       );
 
       if (existingIndex !== -1) {
@@ -155,16 +177,19 @@ const ProductPage = ({ onOpenCart }) => {
   };
 
   const handleBuyNow = () => {
-    if (loading || !isAvailableForPurchase()) return;
+    if (loading || !product.available) return;
 
     const buyNowItem = {
       id: product.id,
       productId: product.id,
       title: product.title,
-      price: product.price,
+      price: getCurrentPrice(), // Use discounted price if available
+      originalPrice: product.price, // Store original price for reference
       image: product.coverImage,
       quantity,
-      variation: selectedVariation, // Include the selected variation
+      variation: selectedVariation, // Include the selected color variation
+      size: selectedSize, // Include the selected size
+      discountApplied: activeDiscount ? activeDiscount.discountPercentage : null,
       createdAt: new Date().toISOString(),
     };
 
@@ -179,7 +204,7 @@ const ProductPage = ({ onOpenCart }) => {
   };
 
   if (!product) return (
-    <div className="min-h-screen bg-[#FFFFFF] flex items-center justify-center">
+    <div className="min-h-screen bg-[#FFF5EE] flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4"></div>
         <p className="text-gray-600">Loading product...</p>
@@ -191,10 +216,11 @@ const ProductPage = ({ onOpenCart }) => {
     ? [product.coverImage, ...product.images]
     : [product.coverImage];
 
-  const availableForPurchase = isAvailableForPurchase();
+  const discountedPrice = getDiscountedPrice();
+  const savings = product.price - discountedPrice;
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-[#FFFFFF] overflow-x-hidden">
+    <div className="relative flex min-h-screen flex-col bg-[#FFF5EE] overflow-x-hidden">
       {showSuccess && (
         <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-[100]">
           <div className="flex items-center gap-3 bg-green-100 border border-green-300 text-green-800 px-5 py-2 rounded-xl shadow-lg animate-fade-in-out transition-all">
@@ -216,77 +242,141 @@ const ProductPage = ({ onOpenCart }) => {
       <div className="layout-container flex h-full grow flex-col bg-[#FFFFFF]">
         <div className="gap-1 px-6 flex flex-1 justify-center py-5 flex-col md:flex-row">
           <div className="flex flex-col max-w-[920px] flex-1">
-            <div className="flex w-full grow p-4">
+            <div className="flex w-full grow p-4 relative">
+              {/* Discount Badge */}
+              {activeDiscount && (
+                <div className="absolute top-6 left-6 z-10">
+                  <div className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+                    -{activeDiscount.discountPercentage}% OFF
+                  </div>
+                  {activeDiscount.description && (
+                    <div className="bg-black text-white px-2 py-1 rounded text-xs mt-1 text-center">
+                      {activeDiscount.description}
+                    </div>
+                  )}
+                </div>
+              )}
               <ProductImageGrid images={allImages} />
             </div>
           </div>
 
           <div className="flex flex-col w-full md:w-[360px]">
-            <ProductInfo
-              title={product.title}
-              price={`PKR ${product.price}`}
-              description={product.description}
-              packageInfo={product.packageInfo || '3 PIECE'}
-            />
+            {/* Product Info with Discount Pricing */}
+            <div className="px-4 py-3">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{product.title}</h1>
+              
+              {/* Price Display with Discount */}
+              <div className="mb-4">
+                {activeDiscount ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl font-bold text-green-600">
+                        PKR {discountedPrice.toLocaleString()}
+                      </span>
+                      <span className="text-lg text-gray-500 line-through">
+                        PKR {product.price.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-sm font-medium">
+                        {activeDiscount.discountPercentage}% OFF
+                      </span>
+                      <span className="text-green-600 text-sm font-medium">
+                        You save PKR {savings.toLocaleString()}
+                      </span>
+                    </div>
+                    {activeDiscount.description && (
+                      <p className="text-sm text-blue-600 font-medium">
+                        🎯 {activeDiscount.description}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-2xl font-bold text-gray-900">
+                    PKR {product.price.toLocaleString()}
+                  </span>
+                )}
+              </div>
+
+              <p className="text-gray-600 mb-4">{product.description}</p>
+              
+              {product.packageInfo && (
+                <p className="text-sm text-gray-500 mb-3">Package: {product.packageInfo}</p>
+              )}
+            </div>
             
-            {/* Stock Status Display */}
             {product.available ? (
-              product.variations && product.variations.length > 0 ? (
-                <div className="px-4">
-                  {selectedVariation && !isSelectedVariationInStock() ? (
-                    <p className="text-red-600 font-medium">Selected color is out of stock</p>
-                  ) : (
-                    <p className="text-green-600 font-medium">In Stock</p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-green-600 font-medium px-4">In Stock</p>
-              )
+              <p className="text-green-600 font-medium px-4">✅ In Stock</p>
             ) : (
-              <p className="text-red-600 font-medium px-4">Will be available soon</p>
+              <p className="text-red-600 font-medium px-4">❌ Out of Stock</p>
             )}
 
-            {/* Color Variations Selector - Simplified */}
+            {/* Color Variations Selector */}
             {product.variations && product.variations.length > 0 && (
               <div className="px-4 py-3">
                 <h3 className="text-sm font-medium text-gray-900 mb-2">Color:</h3>
                 <div className="flex flex-wrap gap-2">
-                  {product.variations.map((variation, index) => {
-                    const variationName = typeof variation === 'string' ? variation : variation.name;
-                    const isInStock = typeof variation === 'string' ? true : variation.inStock;
-                    
-                    return (
-                      <button
-                        key={index}
-                        type="button"
-                        onClick={() => isInStock && setSelectedVariation(variationName)}
-                        disabled={!isInStock}
-                        className={`px-3 py-1 rounded-full text-sm border transition-all duration-200 ${
-                          selectedVariation === variationName
-                            ? isInStock 
-                              ? 'bg-black text-white border-black'
-                              : 'bg-gray-300 text-gray-500 border-gray-300'
-                            : isInStock
-                              ? 'bg-white text-gray-800 border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                              : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50'
-                        }`}
-                      >
-                        {variationName}
-                      </button>
-                    );
-                  })}
+                  {product.variations.map((variation) => (
+                    <button
+                      key={variation}
+                      type="button"
+                      onClick={() => setSelectedVariation(variation)}
+                      className={`px-3 py-1 rounded-full text-sm border ${
+                        selectedVariation === variation
+                          ? 'bg-black text-white border-black'
+                          : 'bg-white text-gray-800 border-gray-300 hover:border-gray-400'
+                      } transition-colors duration-200`}
+                    >
+                      {variation}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Size Variations Selector */}
+            {product.sizes && product.sizes.length > 0 && (
+              <div className="px-4 py-3">
+                <h3 className="text-sm font-medium text-gray-900 mb-2">Size:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {product.sizes.map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => setSelectedSize(size)}
+                      className={`px-3 py-1 rounded-full text-sm border min-w-[40px] ${
+                        selectedSize === size
+                          ? 'bg-green-600 text-white border-green-600'
+                          : 'bg-white text-gray-800 border-gray-300 hover:border-green-400'
+                      } transition-colors duration-200`}
+                    >
+                      {size}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
 
             <QuantitySelector quantity={quantity} setQuantity={setQuantity} />
 
+            {/* Discount Timer (if discount is active) */}
+            {activeDiscount && (
+              <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-red-600 font-bold text-sm">🔥 LIMITED TIME OFFER</span>
+                </div>
+                <p className="text-xs text-red-700">
+                  Offer ends: {(activeDiscount.endDate?.toDate ? activeDiscount.endDate.toDate() : new Date(activeDiscount.endDate)).toLocaleDateString()} at {(activeDiscount.endDate?.toDate ? activeDiscount.endDate.toDate() : new Date(activeDiscount.endDate)).toLocaleTimeString()}
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-col gap-3 p-4">
               <button
                 onClick={handleAddToCart}
-                disabled={!availableForPurchase || loading}
+                disabled={!product.available || loading}
                 className={`w-full border-2 py-3 px-4 rounded-xl font-medium text-base transition-colors ${
-                  availableForPurchase && !loading
+                  product.available && !loading
                     ? 'border-black text-black hover:bg-gray-100'
                     : 'border-gray-400 text-gray-400 cursor-not-allowed'
                 }`}
@@ -299,8 +389,8 @@ const ProductPage = ({ onOpenCart }) => {
                     </svg>
                     Adding...
                   </span>
-                ) : !availableForPurchase ? (
-                  selectedVariation && !isSelectedVariationInStock() ? 'Selected Color Out of Stock' : 'Will be availalable soon'
+                ) : activeDiscount ? (
+                  `Add to Cart - PKR ${getCurrentPrice().toLocaleString()}`
                 ) : (
                   'Add to Cart'
                 )}
@@ -308,19 +398,24 @@ const ProductPage = ({ onOpenCart }) => {
 
               <button
                 onClick={handleBuyNow}
-                disabled={!availableForPurchase || loading}
+                disabled={!product.available || loading}
                 className={`w-full py-3 px-4 rounded-xl font-medium text-base transition-colors ${
-                  availableForPurchase && !loading
+                  product.available && !loading
                     ? 'bg-[#FCBACB] text-white hover:bg-[#FCBACB]'
                     : 'bg-gray-400 text-white cursor-not-allowed'
                 }`}
               >
-                {!availableForPurchase ? (
-                  selectedVariation && !isSelectedVariationInStock() ? 'Selected Color Out of Stock' : 'Out of Stock'
-                ) : (
-                  'Buy Now'
-                )}
+                {activeDiscount ? `Buy Now - PKR ${getCurrentPrice().toLocaleString()}` : 'Buy Now'}
               </button>
+
+              {/* Savings highlight */}
+              {activeDiscount && (
+                <div className="text-center p-2 bg-green-100 rounded-lg">
+                  <p className="text-green-700 font-medium text-sm">
+                    💰 You're saving PKR {(savings * quantity).toLocaleString()} on this purchase!
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Additional Product Details */}
