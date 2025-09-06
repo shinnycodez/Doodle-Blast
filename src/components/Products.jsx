@@ -74,7 +74,6 @@ function Products() {
             )}
 
             <ProductGrid products={allProducts} filters={filters} />
-            <Footer />
           </div>
         </div>
       </div>

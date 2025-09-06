@@ -21,7 +21,6 @@ function Home() {
                         <div>
                   <ContactForm/>
             </div>
-            <Footer />
           </div>
         </div>
       </div>
