@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 const categories = [
     {
     id: 3,
-    title: "Pens ˚⊹♡",
-    imageUrl: "https://pbs.twimg.com/media/G0KeZdRWIAAAc2W?format=jpg&name=small",
-    link: "Pens"
+    title: "Pens and pencils˚⊹♡",
+    imageUrl: "https://pbs.twimg.com/media/G0V8FIJbgAEsMzD?format=jpg&name=small",
+    link: "Pens and pencils"
   },
   {
     id: 1,
@@ -44,6 +44,36 @@ const categories = [
     title: "Markers ⋆⭒˚.⋆",
     imageUrl:"https://pbs.twimg.com/media/G0KfRR9XcAAU2QU?format=jpg&name=small",
      link: "Markers"
+  },
+            {
+    id: 5,
+    title: "Games ⋆⭒˚.⋆",
+    imageUrl:"https://pbs.twimg.com/media/G0V8SQNbYAAQxTh?format=jpg&name=small",
+     link: "Games"
+  },
+              {
+    id: 5,
+    title: "Storage boxes ⋆⭒˚.⋆",
+    imageUrl:"https://pbs.twimg.com/media/G0V8ZPAasAAIsl9?format=jpg&name=small",
+     link: "Storage boxes"
+  },
+                {
+    id: 5,
+    title: "Pouches ⋆⭒˚.⋆",
+    imageUrl:"https://pbs.twimg.com/media/G0V9O2xW8AAUbyh?format=jpg&name=small",
+     link: "Pouches"
+  },
+                  {
+    id: 5,
+    title: "Bags ⋆⭒˚.⋆",
+    imageUrl:"https://pbs.twimg.com/media/G0V9Qb1XwAAt32C?format=jpg&name=small",
+     link: "Bags"
+  },
+                  {
+    id: 5,
+    title: "School items ⋆⭒˚.⋆",
+    imageUrl:"https://pbs.twimg.com/media/G0V9n5KXYAAgu_b?format=jpg&name=small",
+     link: "School items"
   },
   //       {
   //   id: 6,
