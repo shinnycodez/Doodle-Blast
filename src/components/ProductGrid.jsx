@@ -163,7 +163,7 @@ function ProductGrid({ filters = {} }) {
                   </div>
 
                   {/* Product info - fixed height with consistent spacing */}
-                  <div className="px-3 pb-4 flex flex-col justify-between h-[150px]">
+                  <div className="px-3 pb-4 flex flex-col justify-between h-[180px]">
                     <div className="min-h-[80px] overflow-hidden">
                       <p className="text-[#141414] text-base font-medium line-clamp-2">
                         {product.title}
