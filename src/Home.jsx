@@ -18,8 +18,23 @@ function Home() {
             <HeroBanner />
             <FeaturedCategories />
             <ShopTheLook />
-                        <div>
-                  <ContactForm/>
+
+            <div className="mt-10 text-center">
+              <p className="text-lg font-semibold text-gray-800">
+                Or contact us directly on WhatsApp:
+              </p>
+              <a
+                href="https://wa.link/g5ysy0" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-green-600 font-bold underline hover:text-green-700"
+              >
+                +92 332 2675517
+              </a>
+            </div>
+
+            <div className="mt-6">
+              <ContactForm />
             </div>
           </div>
         </div>

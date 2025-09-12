@@ -75,6 +75,12 @@ const categories = [
     imageUrl:"https://pbs.twimg.com/media/G0V9n5KXYAAgu_b?format=jpg&name=small",
      link: "School items"
   },
+                    {
+    id: 5,
+    title: "Deals ⋆⭒˚.⋆",
+    imageUrl:"https://pbs.twimg.com/media/G0qAlZkWwAA0GqH?format=jpg&name=900x900",
+     link: "Deals"
+  },
   //       {
   //   id: 6,
   //   title: "Bag charms",
