@@ -457,7 +457,7 @@ const handleEdit = (product) => {
     );
   };
 
-const OrderDetails = ({ order }) => (
+const OrderDetails = ({ order, products, setViewingImage }) => (
   <div className="mt-4 space-y-3 text-sm text-gray-700 p-2 border-t border-gray-200 pt-3">
     <p><strong>Status:</strong> <span className={`font-semibold ${order.status === 'delivered' ? 'text-green-600' : 'text-orange-600'}`}>{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span></p>
     <p><strong>Payment Method:</strong> {order.payment}</p>
@@ -496,21 +496,38 @@ const OrderDetails = ({ order }) => (
       </div>
     </div>
 
-    <div>
-      <strong>Items:</strong>
-      <ul className="list-disc ml-4 sm:ml-5 mt-1 text-xs sm:text-sm">
-        {(order.items || []).map((item, i) => (
-          <li key={i}>
-            {item.title} – 
-            {item.variation && ` Color: ${item.variation} –`}
-            {item.size && ` Size: ${item.size} –`}
-            {item.type && ` Type: ${item.type} –`}
-            Qty: {item.quantity} – 
-            Price: PKR {item.price?.toLocaleString()}
-          </li>
-        ))}
-      </ul>
-    </div>
+<div>
+  <strong>Items:</strong>
+  <div className="mt-2 space-y-3">
+    {(order.items || []).map((item, i) => {
+      const product = products.find(p => p.id === item.productId || p.title === item.title);
+      return (
+        <div key={i} className="flex gap-3 p-3 bg-white border border-gray-200 rounded-md">
+          {product?.coverImage && (
+            <div
+              className="flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setViewingImage(product.coverImage)}
+            >
+              <img
+                src={product.coverImage}
+                alt={item.title}
+                className="w-16 h-16 object-cover rounded-md border border-gray-300"
+              />
+            </div>
+          )}
+          <div className="flex-1 text-xs sm:text-sm">
+            <p className="font-medium text-gray-900">{item.title}</p>
+            {item.variation && <p className="text-gray-600">Color: {item.variation}</p>}
+            {item.size && <p className="text-gray-600">Size: {item.size}</p>}
+            {item.type && <p className="text-gray-600">Type: {item.type}</p>}
+            <p className="text-gray-600">Quantity: {item.quantity}</p>
+            <p className="text-gray-600">Price: PKR {item.price?.toLocaleString()}</p>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
   </div>
 );
 
@@ -1074,7 +1091,7 @@ const filteredProducts = products.filter(product =>
                             </div>
 
                             {expandedOrders[order.id] && (
-                              <OrderDetails order={order} />
+                          <OrderDetails order={order} products={products} setViewingImage={setViewingImage} />
                             )}
                           </div>
                         ))
@@ -1115,7 +1132,7 @@ const filteredProducts = products.filter(product =>
                             </div>
 
                             {expandedOrders[order.id] && (
-                              <OrderDetails order={order} />
+<OrderDetails order={order} products={products} setViewingImage={setViewingImage} />
                             )}
                           </div>
                         ))
