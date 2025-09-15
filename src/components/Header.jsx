@@ -44,7 +44,7 @@ const Header = () => {
 
           <div className="hidden md:flex items-center gap-5 lg:gap-9">
             <Link to="/" className="text-[#141414] text-sm font-medium transition">Home</Link>
-            <Link to="/products?category=Pens" className="text-[#141414] text-sm font-medium transition">Pens and Pencils ˚⊹♡</Link>
+            <Link to="/products?category=Pens and pencils" className="text-[#141414] text-sm font-medium transition">Pens and Pencils ˚⊹♡</Link>
             <Link to="/products?category=Diaries" className="text-[#141414] text-sm font-medium  transition">Diaries ⋆｡𖦹°</Link>
             <Link to="/products?category=Fans" className="text-[#141414] text-sm font-medium  transition">Fans ˚⋆𐙚｡</Link>
             <Link to="/products?category=Water bottles" className="text-[#141414] text-sm font-medium  transition">Water bottles ˚⋆𐙚｡</Link>
@@ -139,7 +139,7 @@ const Header = () => {
                 </button>
               </div>
 
-              <Link to="/products?category=Pens" onClick={() => setIsMenuOpen(false)} className="block px-4 py-3 hover:bg-[#FFE9DD] rounded-lg transition">Pens ˚⊹♡</Link>
+              <Link to="/products?category=Pens and pencils" onClick={() => setIsMenuOpen(false)} className="block px-4 py-3 hover:bg-[#FFE9DD] rounded-lg transition">Pens and pencils ˚⊹♡</Link>
               <Link to="/products?category=Phone charms" onClick={() => setIsMenuOpen(false)} className="blocsk px-4 py-3 hover:bg-[#FFE9DD] rounded-lg transition">Diaries ⋆｡𖦹°
 </Link>
               <Link to="/products?category=keychains" onClick={() => setIsMenuOpen(false)} className="block px-4 py-3 hover:bg-[#FFE9DD] rounded-lg transition">Fans ˚⋆𐙚｡

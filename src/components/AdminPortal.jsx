@@ -17,6 +17,7 @@ function AdminPortal() {
   const [salesByMonth, setSalesByMonth] = useState([]);
   const [productSales, setProductSales] = useState([]);
   const [totalSales, setTotalSales] = useState({ day: 0, month: 0, year: 0 });
+  const [inventorySearchQuery, setInventorySearchQuery] = useState("");
 
 const [formData, setFormData] = useState({
   title: "",
@@ -557,6 +558,11 @@ const filteredProducts = products.filter(product =>
   product.category.toLowerCase().includes(productSearchQuery.toLowerCase()) ||
   product.price.toString().includes(productSearchQuery)
 );
+const filteredInventoryProducts = products.filter(product =>
+  product.title.toLowerCase().includes(inventorySearchQuery.toLowerCase()) ||
+  product.category.toLowerCase().includes(inventorySearchQuery.toLowerCase()) ||
+  product.price.toString().includes(inventorySearchQuery)
+);
   return (
     <>
       <Header />
@@ -974,65 +980,114 @@ const filteredProducts = products.filter(product =>
             <svg className={`w-5 h-5 transition-transform duration-200 ${showInventory ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
           </button>
 
-          {showInventory && (
-            <div className="mt-4 bg-gray-50 p-4 sm:p-6 rounded-lg shadow-inner grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {products.length === 0 ? (
-                <p className="col-span-full text-center text-gray-500 text-sm sm:text-base py-4">No products found. Add a product to get started!</p>
-              ) : (
-                products.map((product) => {
-                  // Check if product has any active discount
-                  const activeDiscount = discounts.find(discount => 
-                    discount.productIds.includes(product.id) && isDiscountActive(discount)
-                  );
-                  const discountedPrice = activeDiscount 
-                    ? Math.round(product.price * (1 - activeDiscount.discountPercentage / 100))
-                    : null;
+{showInventory && (
+  <div className="mt-4 bg-gray-50 p-4 sm:p-6 rounded-lg shadow-inner">
+    {/* Search Bar */}
+    <div className="mb-6">
+      <div className="relative max-w-md">
+        <input
+          type="text"
+          placeholder="Search inventory by name, category, or price..."
+          value={inventorySearchQuery}
+          onChange={(e) => setInventorySearchQuery(e.target.value)}
+          className="w-full border border-gray-300 rounded-md pl-10 pr-4 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+        />
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        {inventorySearchQuery && (
+          <button
+            type="button"
+            onClick={() => setInventorySearchQuery("")}
+            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+      
+      {inventorySearchQuery && (
+        <p className="text-xs text-gray-600 mt-1">
+          Showing {filteredInventoryProducts.length} of {products.length} products
+        </p>
+      )}
+    </div>
 
-                  return (
-                    <div key={product.id} className={`flex flex-col sm:flex-row gap-4 border border-gray-200 p-4 rounded-md shadow-sm ${product.available === false ? 'bg-gray-100 opacity-80' : 'bg-white'} ${activeDiscount ? 'ring-2 ring-green-300' : ''}`}>
-                      <div className="relative">
-                        <img src={product.coverImage} className="w-24 h-24 object-contain rounded-md flex-shrink-0 mx-auto sm:mx-0" alt={product.title} />
-                        {activeDiscount && (
-                          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                            -{activeDiscount.discountPercentage}%
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 text-center sm:text-left">
-                        <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-1">{product.title}</h3>
-                        <div className="text-sm text-gray-700">
-                          {activeDiscount ? (
-                            <div>
-                              <span className="line-through text-red-500">PKR {product.price?.toLocaleString()}</span>
-                              <span className="ml-2 font-bold text-green-600">PKR {discountedPrice?.toLocaleString()}</span>
-                              <p className="text-xs text-green-600 font-medium">{activeDiscount.description || 'On Sale'}</p>
-                            </div>
-                          ) : (
-                            <p>Price: PKR {product.price?.toLocaleString()}</p>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-700">Category: {product.category}</p>
-                        <p className="text-sm text-gray-700">Top Product: {product.isTopProduct ? "Yes" : "No"}</p>
-                        {product.variations && product.variations.length > 0 && (
-                          <p className="text-sm text-gray-700">Colors: {product.variations.join(', ')}</p>
-                        )}
-                        {product.sizes && product.sizes.length > 0 && (
-                          <p className="text-sm text-gray-700">Sizes: {product.sizes.join(', ')}</p>
-                        )}
-                        <p className="text-sm mt-1">Status: <span className={`font-medium ${product.available === false ? 'text-red-600' : 'text-green-600'}`}>
-                          {product.available === false ? 'Out of Stock' : 'Available'}
-                        </span></p>
-                        <div className="mt-3 flex justify-center sm:justify-start gap-2">
-                          <button onClick={() => handleEdit(product)} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 text-xs sm:text-sm rounded-md transition-colors duration-200">Edit</button>
-                          <button onClick={() => handleDelete(product.id)} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-xs sm:text-sm rounded-md transition-colors duration-200">Delete</button>
-                        </div>
-                      </div>
+    {/* Products Grid */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      {products.length === 0 ? (
+        <p className="col-span-full text-center text-gray-500 text-sm sm:text-base py-4">No products found. Add a product to get started!</p>
+      ) : filteredInventoryProducts.length === 0 ? (
+        <div className="col-span-full text-center py-8">
+          <p className="text-gray-500 text-sm">No products found matching "{inventorySearchQuery}"</p>
+          <button
+            type="button"
+            onClick={() => setInventorySearchQuery("")}
+            className="text-blue-600 hover:text-blue-800 text-sm underline mt-2"
+          >
+            Clear search
+          </button>
+        </div>
+      ) : (
+        filteredInventoryProducts.map((product) => {
+          // Check if product has any active discount
+          const activeDiscount = discounts.find(discount => 
+            discount.productIds.includes(product.id) && isDiscountActive(discount)
+          );
+          const discountedPrice = activeDiscount 
+            ? Math.round(product.price * (1 - activeDiscount.discountPercentage / 100))
+            : null;
+
+          return (
+            <div key={product.id} className={`flex flex-col sm:flex-row gap-4 border border-gray-200 p-4 rounded-md shadow-sm ${product.available === false ? 'bg-gray-100 opacity-80' : 'bg-white'} ${activeDiscount ? 'ring-2 ring-green-300' : ''}`}>
+              <div className="relative">
+                <img src={product.coverImage} className="w-24 h-24 object-contain rounded-md flex-shrink-0 mx-auto sm:mx-0" alt={product.title} />
+                {activeDiscount && (
+                  <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    -{activeDiscount.discountPercentage}%
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-1">{product.title}</h3>
+                <div className="text-sm text-gray-700">
+                  {activeDiscount ? (
+                    <div>
+                      <span className="line-through text-red-500">PKR {product.price?.toLocaleString()}</span>
+                      <span className="ml-2 font-bold text-green-600">PKR {discountedPrice?.toLocaleString()}</span>
+                      <p className="text-xs text-green-600 font-medium">{activeDiscount.description || 'On Sale'}</p>
                     </div>
-                  );
-                })
-              )}
+                  ) : (
+                    <p>Price: PKR {product.price?.toLocaleString()}</p>
+                  )}
+                </div>
+                <p className="text-sm text-gray-700">Category: {product.category}</p>
+                <p className="text-sm text-gray-700">Top Product: {product.isTopProduct ? "Yes" : "No"}</p>
+                {product.variations && product.variations.length > 0 && (
+                  <p className="text-sm text-gray-700">Colors: {product.variations.join(', ')}</p>
+                )}
+                {product.sizes && product.sizes.length > 0 && (
+                  <p className="text-sm text-gray-700">Sizes: {product.sizes.join(', ')}</p>
+                )}
+                <p className="text-sm mt-1">Status: <span className={`font-medium ${product.available === false ? 'text-red-600' : 'text-green-600'}`}>
+                  {product.available === false ? 'Out of Stock' : 'Available'}
+                </span></p>
+                <div className="mt-3 flex justify-center sm:justify-start gap-2">
+                  <button onClick={() => handleEdit(product)} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 text-xs sm:text-sm rounded-md transition-colors duration-200">Edit</button>
+                  <button onClick={() => handleDelete(product.id)} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-xs sm:text-sm rounded-md transition-colors duration-200">Delete</button>
+                </div>
+              </div>
             </div>
-          )}
+          );
+        })
+      )}
+    </div>
+  </div>
+)}
         </div>
 
         {/* Orders Section */}

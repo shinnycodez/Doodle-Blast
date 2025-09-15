@@ -34,55 +34,55 @@ const categories = [
      link: "Water bottles"
   },
         {
-    id: 5,
+    id: 6,
     title: "Sipper ⋆⭒˚.⋆",
     imageUrl:"https://pbs.twimg.com/media/G0KfFR_XkAAIQpJ?format=jpg&name=900x900",
      link: "Sipper"
   },
           {
-    id: 5,
+    id: 7,
     title: "Markers ⋆⭒˚.⋆",
     imageUrl:"https://pbs.twimg.com/media/G0KfRR9XcAAU2QU?format=jpg&name=small",
      link: "Markers"
   },
             {
-    id: 5,
+    id: 8,
     title: "Games ⋆⭒˚.⋆",
     imageUrl:"https://pbs.twimg.com/media/G0V8SQNbYAAQxTh?format=jpg&name=small",
      link: "Games"
   },
-              {
-    id: 5,
-    title: "Storage boxes ⋆⭒˚.⋆",
-    imageUrl:"https://pbs.twimg.com/media/G0V8ZPAasAAIsl9?format=jpg&name=small",
-     link: "Storage boxes"
-  },
+  //             {
+  //   id: 9,
+  //   title: "Storage boxes ⋆⭒˚.⋆",
+  //   imageUrl:"https://pbs.twimg.com/media/G0V8ZPAasAAIsl9?format=jpg&name=small",
+  //    link: "Storage boxes"
+  // },
                 {
-    id: 5,
+    id: 10,
     title: "Pouches ⋆⭒˚.⋆",
     imageUrl:"https://pbs.twimg.com/media/G0V9O2xW8AAUbyh?format=jpg&name=small",
      link: "Pouches"
   },
                   {
-    id: 5,
+    id: 11,
     title: "Bags ⋆⭒˚.⋆",
     imageUrl:"https://pbs.twimg.com/media/G0V9Qb1XwAAt32C?format=jpg&name=small",
      link: "Bags"
   },
                   {
-    id: 5,
+    id: 12,
     title: "School items ⋆⭒˚.⋆",
     imageUrl:"https://pbs.twimg.com/media/G0V9n5KXYAAgu_b?format=jpg&name=small",
      link: "School items"
   },
                     {
-    id: 5,
+    id: 13,
     title: "Deals ⋆⭒˚.⋆",
     imageUrl:"https://pbs.twimg.com/media/G0qAlZkWwAA0GqH?format=jpg&name=900x900",
      link: "Deals"
   },
                       {
-    id: 5,
+    id: 14,
     title: "Accessories ⋆⭒˚.⋆",
     imageUrl:"https://pbs.twimg.com/media/G0qKJPsWAAAW5fq?format=jpg&name=medium",
      link: "Accessories"
@@ -98,16 +98,24 @@ const categories = [
 function FeaturedCategories() {
   return (
 <div>
-  <h2 className="text-[#141414] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">
-    Featured Categories
-  </h2>
+  <div className="flex items-center justify-between px-4 pb-3 pt-5">
+    <h2 className="text-[#141414] text-[22px] font-bold leading-tight tracking-[-0.015em]">
+      Featured Categories
+    </h2>
+    <Link 
+      to="/products"
+      className="text-[#6366f1] text-sm font-medium hover:text-[#4f46e5] transition-colors duration-200"
+    >
+      View All Products
+    </Link>
+  </div>
 
   <div className="grid grid-cols-2 gap-4 p-4 md:grid-cols-3">
     {categories.map(category => (
       <Link
         to={`/products?category=${encodeURIComponent(category.link)}`}
         key={category.id}
-        className="flex flex-col gap-2 group bg-white rounded-lg overflow-hidden shadow-sm transition-transform duration-300 group-hover:scale-[1.03]"
+        className="flex flex-col gap-2 group bg-white rounded-lg overflow-hidden shadow-sm transition-transform duration-300 hover:scale-[1.03] hover:shadow-md"
       >
         <div
           className="w-full aspect-[1/1] bg-center bg-no-repeat bg-cover"
@@ -119,6 +127,21 @@ function FeaturedCategories() {
       </Link>
     ))}
   </div>
+
+  {/* Alternative: View All Products as a card in the grid */}
+  {/* Uncomment this section and comment out the link in the header if you prefer this approach */}
+  {/*
+  <div className="px-4 pb-4">
+    <Link
+      to="/products"
+      className="flex items-center justify-center w-full py-4 px-6 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white rounded-lg font-medium hover:from-[#4f46e5] hover:to-[#7c3aed] transition-all duration-300 shadow-sm hover:shadow-md"
+    >
+      <span className="mr-2">🛍️</span>
+      View All Products
+      <span className="ml-2">→</span>
+    </Link>
+  </div>
+  */}
 </div>
 
   );
